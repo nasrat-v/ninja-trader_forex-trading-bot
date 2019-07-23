@@ -18,7 +18,7 @@ namespace NinjaTrader.Strategy
     /// <summary>
     /// 
     /// </summary>
-    [Description("Une strategie claqué au sol - v1.1")]
+    [Description("Une strategie claqué au sol - v1.2")]
     public class StrategyClaqueAuSol : Strategy
     {
         #region Variables
@@ -27,13 +27,15 @@ namespace NinjaTrader.Strategy
         private int sellLimitOrder = 0; // Default setting for SellLimitOrder
         private int sellTrailStop = 500; // Default setting for SellTrailStop
         private int sellTakeProfit = -100; // Default setting for SellTakeProfit
-        private double sellPercentageEnsureProfit = 50; // Default setting for SellPercentageEnsureProfit
+        private int sellPercentageEnsureProfit = 50; // Default setting for SellPercentageEnsureProfit
+        private int sellEnableEnsureProfit = 100; // Default setting for SellEnableEnsureProfit
 
         private int buyThreshold = -30; // Default setting for BuyThreshold
         private int buyLimitOrder = 0; // Default setting for LuyLimitOrder
         private int buyTrailStop = 500; // Default setting for BuyTrailStop
         private int buyTakeProfit = 100; // Default setting for BuyTakeProfit
-        private double buyPercentageEnsureProfit = 50; // Default setting for BuyPercentageEnsureProfit
+        private int buyPercentageEnsureProfit = 50; // Default setting for BuyPercentageEnsureProfit
+        private int buyEnableEnsureProfit = 100; // Default setting for BuyEnableEnsureProfit
 
         // User defined variables (add any user defined variables below)
         private double barSize;
@@ -141,7 +143,7 @@ namespace NinjaTrader.Strategy
         {
             double maxProfit = (bestEmaBuy - flagProfit); // calcul le profit actuel
             double percentageEnsureProfit = (maxProfit * (buyPercentageEnsureProfit * 0.01));
-            double triggerEnsureProfit = (bestEmaBuy - percentageEnsureProfit);
+            double triggerEnableEnsureProfit = (flagProfit + (buyEnableEnsureProfit * TickSize));
 
             if (isMakingProfitBuy())
             {
@@ -149,10 +151,21 @@ namespace NinjaTrader.Strategy
                 {
                     flagProfit = emaSize;
                     asMadeProfit = true;
+                    // on reinit pour le premier tour de boucle
+                    triggerEnableEnsureProfit = (flagProfit + (buyEnableEnsureProfit * TickSize));
                 }
                 if (emaSize >= bestEmaBuy) // on recupere le plus haut EMA
                     bestEmaBuy = emaSize;
             }
+            // si il a fait du profit (flagProfit est set) et qu'il atteint le trigger alors on check EnsureProfit
+            if (asMadeProfit && emaSize >= triggerEnableEnsureProfit)
+                ensureBuyProfit(percentageEnsureProfit);
+        }
+
+        private void ensureBuyProfit(double percentageEnsureProfit)
+        {
+            double triggerEnsureProfit = (bestEmaBuy - percentageEnsureProfit);
+
             if (emaSize < triggerEnsureProfit) // on stop si on passe sous le trigger EnsureProfit
             {
                 ExitLong();
@@ -164,7 +177,7 @@ namespace NinjaTrader.Strategy
         {
             double maxProfit = (flagProfit - bestEmaSell);
             double percentageEnsureProfit = (maxProfit * (sellPercentageEnsureProfit * 0.01));
-            double triggerEnsureProfit = (bestEmaSell + percentageEnsureProfit);
+            double triggerEnableEnsureProfit = (flagProfit - (sellEnableEnsureProfit * TickSize));
 
             if (isMakingProfitSell())
             {
@@ -172,15 +185,30 @@ namespace NinjaTrader.Strategy
                 {
                     flagProfit = emaSize;
                     asMadeProfit = true;
+                    triggerEnableEnsureProfit = (flagProfit - (sellEnableEnsureProfit * TickSize));
                 }
                 if (emaSize <= bestEmaSell)
                     bestEmaSell = emaSize;
             }
+            if (asMadeProfit && emaSize <= triggerEnableEnsureProfit)
+                ensureSellProfit(percentageEnsureProfit);
+        }
+
+        private void ensureSellProfit(double percentageEnsureProfit)
+        {
+            double triggerEnsureProfit = (bestEmaSell + percentageEnsureProfit);
+
             if (emaSize > triggerEnsureProfit)
             {
                 ExitShort();
                 offerPlaced = false;
             }
+        }
+
+        private void showDebug(string msg, double value)
+        {
+            Print("EMA: " + emaSize.ToString());
+            Print(msg + value.ToString());
         }
 
         private bool shouldBuy()
@@ -238,10 +266,18 @@ namespace NinjaTrader.Strategy
 
         [Description("Trigger, sous forme de pourcentage, qui close un ordre lorque sa valeur est atteinte. Il permet de sécuriser le bénéfice ou d'empecher le déficit. Lorsque l'on fait un bénéfice, si l'on se met à perdre il se déclenche à la valeur donnée.")]
         [GridCategory("Parameters")]
-        public double SellPercentageEnsureProfit
+        public int SellPercentageEnsureProfit
         {
             get { return sellPercentageEnsureProfit; }
             set { sellPercentageEnsureProfit = value; }
+        }
+
+        [Description("Trigger qui active SellPercentageEnsureProfit lorsqu'il est atteint.")]
+        [GridCategory("Parameters")]
+        public int SellEnableEnsureProfit
+        {
+            get { return sellEnableEnsureProfit; }
+            set { sellEnableEnsureProfit = value; }
         }
 
         [Description("Trigger qui place un ordre à une valeur donné, si il est atteint.")]
@@ -278,10 +314,18 @@ namespace NinjaTrader.Strategy
 
         [Description("Trigger, sous forme de pourcentage, qui close un ordre lorque sa valeur est atteinte. Il permet de sécuriser le bénéfice ou d'empecher le déficit. Lorsque l'on fait un bénéfice, si l'on se met à perdre il se déclenche à la valeur donnée.")]
         [GridCategory("Parameters")]
-        public double BuyPercentageEnsureProfit
+        public int BuyPercentageEnsureProfit
         {
             get { return buyPercentageEnsureProfit; }
             set { buyPercentageEnsureProfit = value; }
+        }
+
+        [Description("Trigger qui active BuyPercentageEnsureProfit lorsqu'il est atteint.")]
+        [GridCategory("Parameters")]
+        public int BuyEnableEnsureProfit
+        {
+            get { return buyEnableEnsureProfit; }
+            set { buyEnableEnsureProfit = value; }
         }
         #endregion
     }
