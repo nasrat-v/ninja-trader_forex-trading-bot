@@ -45,6 +45,7 @@ namespace NinjaTrader.Strategy
         private bool isOnBuy;
         private bool isOnSell;
         private bool asMadeProfit;
+		private bool ensureProfitEnabled;
         private double flagProfit;
         private double bestEmaBuy;
         private double bestEmaSell;
@@ -72,6 +73,7 @@ namespace NinjaTrader.Strategy
             isOnBuy = false;
             isOnSell = false;
             asMadeProfit = false;
+			ensureProfitEnabled = false;
             flagProfit = 0;
             bestEmaBuy = Double.MinValue;
             bestEmaSell = Double.MaxValue;
@@ -159,7 +161,9 @@ namespace NinjaTrader.Strategy
             }
             // si il a fait du profit (flagProfit est set) et qu'il atteint le trigger alors on check EnsureProfit
             if (asMadeProfit && emaSize >= triggerEnableEnsureProfit)
-                ensureBuyProfit(percentageEnsureProfit);
+				ensureProfitEnabled = true;
+			if (ensureProfitEnabled)
+				ensureBuyProfit(percentageEnsureProfit);
         }
 
         private void ensureBuyProfit(double percentageEnsureProfit)
@@ -191,6 +195,8 @@ namespace NinjaTrader.Strategy
                     bestEmaSell = emaSize;
             }
             if (asMadeProfit && emaSize <= triggerEnableEnsureProfit)
+				ensureProfitEnabled = true;
+			if (ensureProfitEnabled)
                 ensureSellProfit(percentageEnsureProfit);
         }
 
