@@ -23,13 +23,13 @@ namespace NinjaTrader.Strategy
     {
         #region Variables
         // Wizard generated variables
-		private int minimalGapForPrepaSell = 0;
+	private int minimalGapForPrepaSell = 0;
 
         // User defined variables (add any user defined variables below)
         private bool isOnBuy;
         private bool isOnSell;
-		private bool modePrepa;
-		private bool modeAction;
+	private bool modePrepa;
+	private bool modeAction;
         #endregion
 
         /// <summary>
@@ -37,98 +37,98 @@ namespace NinjaTrader.Strategy
         /// </summary>
         protected override void Initialize()
         {
-			// Calculate on the close of each bar
-    		CalculateOnBarClose = false;
-			modePrepa = false;
-			modeAction = false;
+            // Calculate on the close of each bar
+            CalculateOnBarClose = false;
+            modePrepa = false;
+            modeAction = false;
         }
 		
-		private double getEMA()
-		{
-			return (EMA(0)[0]);
-		}
+	private double getEMA()
+	{
+            return (EMA(0)[0]);
+	}
 		
-		private double getFirstHighEMA()
-		{
-			return (EMA(High, 1)[0]);
-		}
+	private double getFirstHighEMA()
+	{
+            return (EMA(High, 1)[0]);
+	}
 		
-		private double getSecondHighEMA()
-		{
-			return (EMA(High, 2)[0]);
-		}
+	private double getSecondHighEMA()
+	{
+            return (EMA(High, 2)[0]);
+	}
 		
-		private double getFirstLowEMA()
-		{
-			return (EMA(Low, 1)[0]);
-		}
+	private double getFirstLowEMA()
+	{
+            return (EMA(Low, 1)[0]);
+	}
 		
-		private double getSecondLowEMA()
-		{
-			return (EMA(Low, 2)[0]);
-		}
+	private double getSecondLowEMA()
+	{
+            return (EMA(Low, 2)[0]);
+	}
 		
-		private double getBarSize()
-		{
+	private double getBarSize()
+	{
             return ((Input[0] - Open[0]) / TickSize);
-		}
+	}
 		
         /// <summary>
         /// Called on each bar update event (incoming tick)
         /// </summary>
         protected override void OnBarUpdate()
         {
-			Print("barsize : " + getBarSize().ToString());
-			//Print("EMA : " + getEMA().ToString());
-			//Print("Bleu foncé : " + getSecondHighEMA().ToString());
-			if (!modePrepa && !modeAction && shouldPrepareSell())
-			{
-				Print("Mode prépa");
-				modePrepa = true;
-			}
-			if (modePrepa && !modeAction && shouldEnterSell())
-			{
-				Print("Enter");
-				modeAction = true;
-				modePrepa = false;
-				EnterShortStop(GetCurrentBid(), "short stop");
-				Print("CurrentBid : " + GetCurrentBid().ToString());
-			}
-			if (modeAction && !modePrepa && shouldExitSell())
-			{
-				Print("Exit");
-				ExitShort("short stop");
-				modeAction = false;
-			}
+            Print("barsize : " + getBarSize().ToString());
+            //Print("EMA : " + getEMA().ToString());
+            //Print("Bleu foncé : " + getSecondHighEMA().ToString());
+            if (!modePrepa && !modeAction && shouldPrepareSell())
+            {
+                Print("Mode prépa");
+		modePrepa = true;
+            }
+            if (modePrepa && !modeAction && shouldEnterSell())
+            {
+		Print("Enter");
+		modeAction = true;
+		modePrepa = false;
+		EnterShortStop(GetCurrentBid(), "short stop");
+		Print("CurrentBid : " + GetCurrentBid().ToString());
+            }
+            if (modeAction && !modePrepa && shouldExitSell())
+            {
+		Print("Exit");
+		ExitShort("short stop");
+		modeAction = false;
+            }
         }
 		
-		private bool shouldPrepareSell() 
-		{
-			return (getEMA() > getSecondHighEMA() && isMinimalGapForPrepaSell());
-		}
+	private bool shouldPrepareSell() 
+	{
+            return (getEMA() > getSecondHighEMA() && isMinimalGapForPrepaSell());
+	}
 		
-		private bool shouldEnterSell()
-		{
-			return (getEMA() < getSecondHighEMA());
-		}
+	private bool shouldEnterSell()
+	{
+            return (getEMA() < getSecondHighEMA());
+	}
 		
-		private bool isMinimalGapForPrepaSell()
-		{
-			return ((getFirstHighEMA() - getSecondHighEMA()) >= (minimalGapForPrepaSell * TickSize));
-		}
+	private bool isMinimalGapForPrepaSell()
+	{
+            return ((getFirstHighEMA() - getSecondHighEMA()) >= (minimalGapForPrepaSell * TickSize));
+	}
 		
-		private bool shouldExitSell()
-		{
-			return (getFirstHighEMA() < getSecondHighEMA());
-		}
+	private bool shouldExitSell()
+	{
+            return (getFirstHighEMA() < getSecondHighEMA());
+	}
 
         private void showDebug(string msg, double value)
         {
             Print("EMA: " + getEMA().ToString()); // violette
-			Print("EMA High 1: " + getFirstHighEMA().ToString()); // bleu clair
-			Print("EMA High 2: " + getSecondHighEMA().ToString()); // bleu foncé
-			Print("EMA Low 1: " + getFirstLowEMA().ToString()); // vert clair
-			Print("EMA Low 2: " + getSecondLowEMA().ToString()); // vert foncé
+            Print("EMA High 1: " + getFirstHighEMA().ToString()); // bleu clair
+            Print("EMA High 2: " + getSecondHighEMA().ToString()); // bleu foncé
+            Print("EMA Low 1: " + getFirstLowEMA().ToString()); // vert clair
+            Print("EMA Low 2: " + getSecondLowEMA().ToString()); // vert foncé
             //Print(msg + value.ToString());
         }
 
