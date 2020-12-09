@@ -18,8 +18,8 @@ namespace NinjaTrader.Strategy
     /// <summary>
     /// 
     /// </summary>
-    [Description("Statrégie v2 avec ajout d'un stop loss et second exit en fonction de l'entrée et non plus en fonction de la premiere sortie - v2.1")]
-    public class StrategyClaqueV2_1 : Strategy
+    [Description("Une strategie un peu moins claqué au sol - v2")]
+    public class StrategyClaqueV2 : Strategy
     {
 		enum StateAutomate 
 		{
@@ -27,17 +27,13 @@ namespace NinjaTrader.Strategy
 			ENTER,
 			FIRST_EXIT,
 			SECOND_EXIT,
-			STOP_LOSS_EXIT,
 			WAITING
 		};
-		
+
         #region Variables
         // Wizard generated variables
 		private int minimalGapForPrepaSell = 0;
 		private double percentageForSecondExit = 0.5; // la moitié
-		private int pointsStopLoss = 10;
-		private int totalVolumes = 2000;
-		private int pointsForFirstExit = 10;
 
         // User defined variables (add any user defined variables below)
         private bool isOnBuy;
@@ -47,10 +43,10 @@ namespace NinjaTrader.Strategy
 		private bool firstVolumeExited;
 		private double profitAfterFirstExit;
 		private double maxProfitAfterFirstExit;
-		private double baseValueEMAWhenEnter;
+		private double baseValueEMAWhenFirstExit;
 		private StateAutomate state;
         #endregion
-		
+
 
         /// <summary>
         /// This method is used to configure the strategy and is called once before any strategy method is called.
@@ -59,59 +55,47 @@ namespace NinjaTrader.Strategy
         {
 			// Calculate on the close of each bar
     		CalculateOnBarClose = false;
-			resetAfterAllPositionsExited();
-			state = StateAutomate.WAITING;
-        }
-		
-		private void resetAfterAllPositionsExited()
-		{
 			modePrepa = false;
 			modeAction = false;
 			firstVolumeExited = false;
 			profitAfterFirstExit = 0;
 			maxProfitAfterFirstExit = 0;
-			baseValueEMAWhenEnter = 0;
-		}
-		
+			baseValueEMAWhenFirstExit = 0;
+			state = StateAutomate.WAITING;
+        }
+
 		private double getEMA()
 		{
 			return (EMA(0)[0]);
 		}
-		
+
 		private double getFirstHighEMA()
 		{
 			return (EMA(High, 1)[0]);
 		}
-		
+
 		private double getSecondHighEMA()
 		{
 			return (EMA(High, 2)[0]);
 		}
-		
+
 		private double getFirstLowEMA()
 		{
 			return (EMA(Low, 1)[0]);
 		}
-		
+
 		private double getSecondLowEMA()
 		{
 			return (EMA(Low, 2)[0]);
 		}
-		
+
 		private double getBarSize()
 		{
             return ((Input[0] - Open[0]) / TickSize);
 		}
-		
-		private double getBaseValue()
-		{
-			return (getEMA() + TickSize);
-		}
-		
+
 		private StateAutomate getNewState()
 		{
-			if (baseValueEMAWhenEnter != 0 && shouldExitStopLoss()) // doit toujours être testé en premier
-				return (StateAutomate.STOP_LOSS_EXIT);
 			if (!modePrepa && !modeAction && shouldPrepareSell())
 				return (StateAutomate.PREPA);
 			if (modePrepa && !modeAction && shouldEnterSell())
@@ -122,55 +106,63 @@ namespace NinjaTrader.Strategy
 				return (StateAutomate.SECOND_EXIT);
 			return (StateAutomate.WAITING);
 		}
-		
+
 		private void preparePosition()
 		{
 			Print("Mode prépa");
 			modePrepa = true;
 		}
-		
+
 		private void enterSellPosition()
 		{
 			Print("Enter");
 			modeAction = true;
 			modePrepa = false;
-			EnterShortStop(totalVolumes, GetCurrentBid(), "Enter_Sell");
-			baseValueEMAWhenEnter = getBaseValue();
+			EnterShortStop(2, GetCurrentBid(), "Enter_Sell");
 		}
-		
+
 		private void exitFirstSellPosition()
 		{
 			Print("Exit 1");
-			ExitShort((totalVolumes / 2), "First_Exit", "Enter_Sell");
+			ExitShort(1, "First_Exit", "Enter_Sell");
 			firstVolumeExited = true;
 		}
-		
+
 		private void exitSecondSellPosition()
 		{
 			Print("Exit 2");
-			ExitShort((totalVolumes / 2), "Second_Exit", "Enter_Sell");
-			resetAfterAllPositionsExited();
+			ExitShort(1, "Second_Exit", "Enter_Sell");
+			modeAction = false;
+			firstVolumeExited = false;
+			profitAfterFirstExit = 0;
+			maxProfitAfterFirstExit = 0;
+			baseValueEMAWhenFirstExit = 0;
 		}
-		
-		private void exitStopLoss()
-		{
-			Print("Exit Stop Loss");
-			ExitShort(totalVolumes, "Stop_Loss_Exit", "Enter_Sell");
-			resetAfterAllPositionsExited();
-		}
-		
+
 		private void checkToExitSecondSellPosition()
 		{
-			profitAfterFirstExit = (baseValueEMAWhenEnter - getEMA()); // on recupere la différence de profit
-			if (profitAfterFirstExit != 0)
+			if (profitAfterFirstExit == 0)
 			{
-				if (maxProfitAfterFirstExit < profitAfterFirstExit)
-					maxProfitAfterFirstExit = profitAfterFirstExit; // on sauvegarde le profit max
-				if (shouldExitSecondVolumeSell())
-					exitSecondSellPosition(); // si le profit actuel est redescendu du (profit max * percentageForSecondExit) on quitte
+				baseValueEMAWhenFirstExit = (getEMA() + TickSize);
+				profitAfterFirstExit = 1; // on sauvegarde la valeur de l'EMA qui nous servira de reférence pour caclculer le profit
+			}				
+			else 
+			{
+				profitAfterFirstExit = (baseValueEMAWhenFirstExit - getEMA()); // on recupere la différence de profit
+				if (profitAfterFirstExit == 0)
+					profitAfterFirstExit = 1; // si la différence est nul on quitte et attends qu'il y ait du profit
+				else if (profitAfterFirstExit < 0) 
+					exitSecondSellPosition(); // si la courbe s'inverse rapidement et que l'on ne fait plus de profit on quitte
+				else
+				{
+					if (maxProfitAfterFirstExit < profitAfterFirstExit)
+						maxProfitAfterFirstExit = profitAfterFirstExit; // on sauvegarde le profit max
+					if (shouldExitSecondVolumeSell())
+						exitSecondSellPosition(); // si le profit actuel est redescendu du (profit max * percentageForSecondExit) on quitte
+				}
 			}
 		}
-		
+
         /// <summary>
         /// Called on each bar update event (incoming tick)
         /// </summary>
@@ -191,44 +183,35 @@ namespace NinjaTrader.Strategy
 				case StateAutomate.SECOND_EXIT:
 					checkToExitSecondSellPosition();
 					break;
-				case StateAutomate.STOP_LOSS_EXIT:
-					exitStopLoss();
-					break;
 				case StateAutomate.WAITING:
 				default:
 					return;
 			}
         }
-		
+
 		private bool shouldPrepareSell() 
 		{
 			return (getEMA() > getSecondHighEMA() && isMinimalGapForPrepaSell());
 		}
-		
+
 		private bool shouldEnterSell()
 		{
 			return (getEMA() < getSecondHighEMA());
 		}
-		
+
 		private bool isMinimalGapForPrepaSell()
 		{
 			return ((getFirstHighEMA() - getSecondHighEMA()) >= (minimalGapForPrepaSell * TickSize));
 		}
-		
+
 		private bool shouldExitFirstVolumeSell()
 		{
-			return (getBaseValue() <= (baseValueEMAWhenEnter - (pointsForFirstExit * TickSize)));
-			//return (getFirstHighEMA() < getSecondHighEMA());
+			return (getFirstHighEMA() < getSecondHighEMA());
 		}
-		
+
 		private bool shouldExitSecondVolumeSell()
 		{
 			return (profitAfterFirstExit <= (maxProfitAfterFirstExit * percentageForSecondExit));
-		}
-		
-		private bool shouldExitStopLoss()
-		{
-			return (getBaseValue() >= (baseValueEMAWhenEnter + (pointsStopLoss * TickSize)));
 		}
 
         private void showDebug(string msg, double value)
@@ -249,7 +232,7 @@ namespace NinjaTrader.Strategy
             get { return minimalGapForPrepaSell; }
             set { minimalGapForPrepaSell = value; }
         }
-		
+
 		[Description("Pourcentage de perte du profit avant de couper le second volume.")]
         [GridCategory("Parameters")]
         public double PercentageForSecondExit
@@ -257,30 +240,6 @@ namespace NinjaTrader.Strategy
             get { return percentageForSecondExit; }
             set { percentageForSecondExit = value; }
         }
-		
-		[Description("Nombre de points de perte maximum avant de couper toute position.")]
-        [GridCategory("Parameters")]
-        public int PointsStopLoss
-        {
-            get { return pointsStopLoss; }
-            set { pointsStopLoss = value; }
-        }
-		
-		[Description("Volumes total joué. Le volume est divisé par deux, un volume pour chaque exit.")]
-        [GridCategory("Parameters")]
-        public int TotalVolumes
-        {
-            get { return totalVolumes; }
-            set { totalVolumes = value; }
-        }
-		
-		[Description("Nombre de points a atteindre pour déclencher le premier exit.")]
-        [GridCategory("Parameters")]
-        public int PointsForFirstExit
-        {
-            get { return pointsForFirstExit; }
-            set { pointsForFirstExit = value; }
-        }
         #endregion
     }
-}
+} 
