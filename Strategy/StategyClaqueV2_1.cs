@@ -48,6 +48,7 @@ namespace NinjaTrader.Strategy
 		private double profitAfterFirstExit;
 		private double maxProfitAfterFirstExit;
 		private double baseValueEMAWhenEnter;
+		private double baseValueEMAWhenFirstExit;
 		private StateAutomate state;
         #endregion
 		
@@ -71,6 +72,7 @@ namespace NinjaTrader.Strategy
 			profitAfterFirstExit = 0;
 			maxProfitAfterFirstExit = 0;
 			baseValueEMAWhenEnter = 0;
+			baseValueEMAWhenFirstExit = 0;
 		}
 		
 		private double getEMA()
@@ -143,6 +145,7 @@ namespace NinjaTrader.Strategy
 			Print("Exit 1");
 			ExitShort((totalVolumes / 2), "First_Exit", "Enter_Sell");
 			firstVolumeExited = true;
+			baseValueEMAWhenFirstExit = getBaseValue();
 		}
 		
 		private void exitSecondSellPosition()
@@ -161,7 +164,7 @@ namespace NinjaTrader.Strategy
 		
 		private void checkToExitSecondSellPosition()
 		{
-			profitAfterFirstExit = (baseValueEMAWhenEnter - getEMA()); // on recupere la différence de profit
+			profitAfterFirstExit = (baseValueEMAWhenFirstExit - getEMA()); // on recupere la différence de profit
 			if (profitAfterFirstExit != 0)
 			{
 				if (maxProfitAfterFirstExit < profitAfterFirstExit)
@@ -218,7 +221,6 @@ namespace NinjaTrader.Strategy
 		private bool shouldExitFirstVolumeSell()
 		{
 			return (getBaseValue() <= (baseValueEMAWhenEnter - (pointsForFirstExit * TickSize)));
-			//return (getFirstHighEMA() < getSecondHighEMA());
 		}
 		
 		private bool shouldExitSecondVolumeSell()
